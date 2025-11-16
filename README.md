@@ -4,9 +4,10 @@ A Discord bot that automatically summarizes news articles and YouTube videos usi
 
 ## Features
 
-- **📰 News Summarization**: Fetches and summarizes articles from major news sources (BBC, CNN, Reuters)
+- **📰 News Summarization**: Fetches and summarizes articles from Uruguayan and international news sources
 - **🎥 YouTube Summarization**: Summarizes videos from configured YouTube channels
 - **🤖 AI-Powered**: Uses OpenAI GPT-5-mini for news and Google Gemini Flash for YouTube videos
+- **🔍 Smart Filtering**: Model-based content filtering to identify politics/economy articles with keyword fallback
 - **⚡ Prefix Commands**: Use `!summarizenews` and `!summarizeyoutube` to invoke the bot
 
 ## Prerequisites
@@ -74,12 +75,21 @@ You can customize the news sources and YouTube channels in `config.py`:
 
 ### Gating & filtering
 
-The bot filters (gates) which articles/videos are summarized. By default the system uses a model-based gating strategy (OpenAI) and falls back to keyword checks on errors.
+The bot intelligently filters (gates) which articles/videos are summarized based on relevance. By default, it uses **model-based gating** where an AI classifier (`is_article_relevant`) determines if content is about politics, economy, or related topics.
 
-- **ENABLE_GATING**: Enable or disable gating (default: `true`).
-- **GATING_STRATEGY**: Which strategy to use for gating (`model` or `keywords`). Default: `model`.
-- **MODEL_BASED_GATING_MODEL**: The model name to use (default: `gpt-5-nano`).
-- **MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS**: If true, fallback to keywords when the model cannot classify (default: `true`).
+Environment variables (set in `.env`):
+
+- **ENABLE_GATING**: Enable or disable content filtering (default: `true`)
+- **GATING_STRATEGY**: Strategy to use — `model` (AI classifier) or `keywords` (pattern matching). Default: `model`
+- **USE_MODEL_BASED_GATING**: Enable AI-based classification (default: `true`)
+- **MODEL_BASED_GATING_MODEL**: Model name for classification (default: `gpt-5-nano`)
+- **MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS**: If `true`, falls back to keyword matching when the AI classifier fails or returns inconclusive results (default: `true`)
+- **GATING_KEYWORDS**: Comma-separated keywords for fallback matching (see `config.py` for defaults)
+- **GATING_MATCH_MODE**: How keywords are evaluated — `allow_if_any` or `deny_if_any` (default: `allow_if_any`)
+- **GATING_DEFAULT_ON_ERROR**: Default decision when gating encounters errors (default: `true`)
+- **GATING_CACHE_TTL_SECONDS**: How long to cache gating decisions in seconds (default: `86400` = 24 hours)
+
+The model-based approach is more accurate and context-aware than simple keyword matching, but has higher latency and API costs. The fallback mechanism ensures the bot continues working even if the AI service is unavailable.
 
 
 Example YouTube channel feed URL format:
@@ -94,13 +104,19 @@ summarizer/
 ├── bot.py                    # Main bot entry point
 ├── config.py                 # Configuration and API keys
 ├── requirements.txt          # Python dependencies
+├── test.py                   # Manual testing harness (no Discord required)
 ├── .env                      # Environment variables (not in git)
+├── .github/
+│   └── copilot-instructions.md  # AI agent guidance
 ├── cogs/
 │   ├── news.py              # News summarization command
 │   └── youtube.py           # YouTube summarization command
-└── services/
-    ├── ai_services.py       # AI provider wrappers (OpenAI, Gemini)
-    └── content_fetcher.py   # Article content extraction
+├── services/
+│   ├── ai_services.py       # AI provider wrappers (OpenAI, Gemini)
+│   ├── content_fetcher.py   # Article content extraction
+│   └── gating.py            # Content filtering logic (model + keywords)
+└── tools/
+    └── check_feeds.py       # Feed validation utility
 ```
 
 ## Troubleshooting
@@ -108,8 +124,11 @@ summarizer/
 - **Bot doesn't respond**: Make sure the bot is invited with the right permissions and you are using the `!` prefix commands.
    - If the bot is in the server but not responding, double-check bot permissions (Send Messages, Embed Links) and that your message starts with `!`.
 - **"Missing API keys" warning**: Check your `.env` file has all three required keys
-- **AI summary fails**: Check your API key quotas and limits
+- **AI summary fails**: Check your API key quotas and limits. For OpenAI, ensure you have access to the configured models.
 - **Article scraping fails**: Some websites block automated scraping; this is expected for certain sources
+- **Model gating errors**: If you see `max_output_tokens` errors, the OpenAI Responses API requires minimum 16 tokens. This is already configured correctly.
+- **All articles filtered out**: Check your gating configuration. Run `python test.py` to see gating decisions and matches in the logs.
+- **High API costs**: Consider setting `GATING_STRATEGY=keywords` or reducing `ARTICLES_PER_FEED` to lower the number of AI calls.
 
 ## License
 
