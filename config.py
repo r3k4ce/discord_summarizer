@@ -23,7 +23,8 @@ RSS_FEEDS = [
     # "http://feeds.bbci.co.uk/news/world/rss.xml",
     # "http://rss.cnn.com/rss/cnn_topstories.rss",
     # "https://feeds.reuters.com/reuters/topNews",
-    "https://www.montevideo.com.uy/anxml.aspx?58"
+    "https://www.montevideo.com.uy/anxml.aspx?58",
+    "https://www.elobservador.com.uy/rss/pages/nacional.xml"
 ]
 
 YOUTUBE_CHANNEL_FEEDS = [
