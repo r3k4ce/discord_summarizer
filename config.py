@@ -11,6 +11,7 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+TEST_GUILD_ID = os.getenv("TEST_GUILD_ID")
 
 if not DISCORD_TOKEN or not OPENAI_API_KEY or not GEMINI_API_KEY:
     logging.warning(
@@ -19,9 +20,10 @@ if not DISCORD_TOKEN or not OPENAI_API_KEY or not GEMINI_API_KEY:
 
 # --- Feed configuration ---
 RSS_FEEDS = [
-    "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "http://rss.cnn.com/rss/cnn_topstories.rss",
-    "https://feeds.reuters.com/reuters/topNews",
+    # "http://feeds.bbci.co.uk/news/world/rss.xml",
+    # "http://rss.cnn.com/rss/cnn_topstories.rss",
+    # "https://feeds.reuters.com/reuters/topNews",
+    "https://www.montevideo.com.uy/anxml.aspx?58"
 ]
 
 YOUTUBE_CHANNEL_FEEDS = [
@@ -35,4 +37,5 @@ __all__ = [
     "GEMINI_API_KEY",
     "RSS_FEEDS",
     "YOUTUBE_CHANNEL_FEEDS",
+    "TEST_GUILD_ID",
 ]

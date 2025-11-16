@@ -12,7 +12,7 @@ from config import DISCORD_TOKEN
 
 
 class SummarizerBot(commands.Bot):
-    """Discord bot that loads cogs dynamically and syncs slash commands."""
+    """Discord bot that loads cogs dynamically and registers prefix commands."""
 
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -21,11 +21,12 @@ class SummarizerBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self._load_cogs()
+        # Using text (prefix-based) commands; no app command syncing is
+        # necessary. List loaded commands for visibility.
         try:
-            synced = await self.tree.sync()
-            logging.info("Synced %s command(s)", len(synced))
-        except Exception as exc:  # pylint: disable=broad-except
-            logging.error("Failed to sync commands: %s", exc)
+            logging.info("Loaded text commands: %s", [c.name for c in self.commands])
+        except Exception:  # defensive: avoid failing startup for logging errors
+            logging.exception("Unable to list commands during setup_hook")
 
     async def _load_cogs(self) -> None:
         cogs_dir = Path(__file__).parent / "cogs"
@@ -56,7 +57,7 @@ def main() -> None:
     async def on_ready() -> None:
         if bot.user:
             logging.info("Logged in as %s (%s)", bot.user, bot.user.id)
-        logging.info("Bot ready. Slash commands registered.")
+        logging.info("Bot ready. Text commands registered.")
 
     bot.run(DISCORD_TOKEN)
 

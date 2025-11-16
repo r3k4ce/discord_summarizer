@@ -7,7 +7,7 @@ A Discord bot that automatically summarizes news articles and YouTube videos usi
 - **📰 News Summarization**: Fetches and summarizes articles from major news sources (BBC, CNN, Reuters)
 - **🎥 YouTube Summarization**: Summarizes videos from configured YouTube channels
 - **🤖 AI-Powered**: Uses OpenAI GPT-5-mini for news and Google Gemini Flash for YouTube videos
-- **⚡ Slash Commands**: Simple `/summarizenews` and `/summarizeyoutube` commands
+- **⚡ Prefix Commands**: Use `!summarizenews` and `!summarizeyoutube` to invoke the bot
 
 ## Prerequisites
 
@@ -55,9 +55,15 @@ A Discord bot that automatically summarizes news articles and YouTube videos usi
    - Select bot permissions: `Send Messages`, `Embed Links`
    - Use the generated URL to invite the bot to your server
 
-3. **Use the slash commands in Discord**:
-   - `/summarizenews` - Summarizes the latest 2 articles from each configured news feed
-   - `/summarizeyoutube` - Summarizes the latest 2 videos from each configured YouTube channel
+3. **Use the bot commands in Discord**:
+   - `!summarizenews` - Summarizes the latest 2 articles from each configured news feed
+   - `!summarizeyoutube` - Summarizes the latest 2 videos from each configured YouTube channel
+
+   ---
+
+   ### ⚡ Fast testing (prefix commands)
+
+   For prefix commands, features are available as soon as the bot is online in your server; you do not need to wait for global sync.
 
 ## Configuration
 
@@ -89,7 +95,8 @@ summarizer/
 
 ## Troubleshooting
 
-- **Bot doesn't respond**: Make sure slash commands are synced (happens automatically on startup)
+- **Bot doesn't respond**: Make sure the bot is invited with the right permissions and you are using the `!` prefix commands.
+   - If the bot is in the server but not responding, double-check bot permissions (Send Messages, Embed Links) and that your message starts with `!`.
 - **"Missing API keys" warning**: Check your `.env` file has all three required keys
 - **AI summary fails**: Check your API key quotas and limits
 - **Article scraping fails**: Some websites block automated scraping; this is expected for certain sources

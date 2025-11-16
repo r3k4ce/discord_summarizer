@@ -1,29 +1,30 @@
-"""Slash command cog for news summarization."""
+"""Text command cog for news summarization (prefix commands)."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from io import BytesIO
 
 import discord
 import feedparser
-from discord import app_commands
 from discord.ext import commands
 
 from config import RSS_FEEDS
 from services.ai_services import get_ai_summary
-from services.content_fetcher import fetch_article_text
+from services.content_fetcher import download_image, fetch_article_with_image
 
 
 class NewsCog(commands.Cog):
-    """Handles /summarizenews requests."""
+    """Handles !summarizenews requests (text-based commands)."""
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="summarizenews", description="Summarize the latest stories from configured RSS feeds")
-    async def summarize_news(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(thinking=True)
+    @commands.command(name="summarizenews", help="Summarize the latest stories from configured RSS feeds")
+    async def summarize_news(self, ctx: commands.Context) -> None:
+        # Let users know the command is being processed
+        await ctx.send("Fetching and summarizing news...")
         loop = asyncio.get_running_loop()
         sent_anything = False
 
@@ -35,7 +36,9 @@ class NewsCog(commands.Cog):
                 for entry in feed.entries[:2]:
                     article_title = entry.title
                     article_link = entry.link
-                    article_text = await loop.run_in_executor(None, fetch_article_text, article_link)
+                    article_text, article_image_url = await loop.run_in_executor(
+                        None, fetch_article_with_image, article_link
+                    )
 
                     if not article_text:
                         logging.warning("Could not scrape article: %s", article_title)
@@ -53,21 +56,28 @@ class NewsCog(commands.Cog):
                         color=discord.Color.blue(),
                     )
                     embed.set_footer(text=f"Source: {feed_title}")
-                    await interaction.followup.send(embed=embed)
+                    file = None
+                    if article_image_url:
+                        image_bytes = await loop.run_in_executor(None, download_image, article_image_url)
+                        if image_bytes:
+                            file = discord.File(BytesIO(image_bytes), filename="article.jpg")
+                            embed.set_image(url="attachment://article.jpg")
+                        else:
+                            logging.warning("Image download failed for article: %s", article_title)
+
+                    if file:
+                        await ctx.send(embed=embed, file=file)
+                    else:
+                        await ctx.send(embed=embed)
                     sent_anything = True
             except Exception as exc:  # pylint: disable=broad-except
                 logging.exception("Error processing feed %s", feed_url)
-                await interaction.followup.send(
-                    f"Error processing feed `{feed_url}`. Check logs for details.", ephemeral=True
-                )
+                await ctx.send(f"Error processing feed `{feed_url}`. Check logs for details.")
 
         if not sent_anything:
-            await interaction.followup.send(
-                "Could not fetch or summarize any news right now. Please try again later.",
-                ephemeral=True,
-            )
+            await ctx.send("Could not fetch or summarize any news right now. Please try again later.")
         else:
-            await interaction.followup.send("All feeds summarized!", ephemeral=False)
+            await ctx.send("All feeds summarized!")
 
 
 async def setup(bot: commands.Bot) -> None:
