@@ -62,6 +62,23 @@ MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS = os.getenv(
     "MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS", "true"
 ).lower() == "true"
 
+# --- AI model selection ---
+# These knobs let you swap summarization/analysis models without touching code.
+# Use .env to override them per environment (dev vs prod) and keep prompts centralized.
+TEXT_SUMMARY_MODEL_PRIMARY = os.getenv("TEXT_SUMMARY_MODEL_PRIMARY", "gpt-5-mini")
+TEXT_SUMMARY_MODEL_FALLBACK = os.getenv("TEXT_SUMMARY_MODEL_FALLBACK", "gpt-4o-mini")
+TEXT_SUMMARY_MAX_TOKENS = int(os.getenv("TEXT_SUMMARY_MAX_TOKENS", "256"))
+TEXT_SUMMARY_TEMPERATURE = float(os.getenv("TEXT_SUMMARY_TEMPERATURE", "0.3"))
+
+# --- Audio overview configuration ---
+ENABLE_AUDIO_OVERVIEWS = os.getenv("ENABLE_AUDIO_OVERVIEWS", "false").lower() == "true"
+AUDIO_SUMMARY_MODEL = os.getenv("AUDIO_SUMMARY_MODEL", "gpt-5-mini")
+TTS_MODEL = os.getenv("TTS_MODEL", "gemini-2.5-pro-preview-tts")
+TTS_LANGUAGE_CODE = os.getenv("TTS_LANGUAGE_CODE", "es-ES")
+TTS_VOICE = os.getenv("TTS_VOICE", "Zephyr")
+
+VIDEO_SUMMARY_MODEL = os.getenv("VIDEO_SUMMARY_MODEL", "gemini-flash-latest")
+
 # --- Feed configuration ---
 ARTICLES_PER_FEED = int(os.getenv("ARTICLES_PER_FEED", "10"))
 RSS_FEEDS = [
@@ -94,5 +111,15 @@ __all__ = [
     "USE_MODEL_BASED_GATING",
     "MODEL_BASED_GATING_MODEL",
     "MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS",
+    "TEXT_SUMMARY_MODEL_PRIMARY",
+    "TEXT_SUMMARY_MODEL_FALLBACK",
+    "TEXT_SUMMARY_MAX_TOKENS",
+    "TEXT_SUMMARY_TEMPERATURE",
+    "ENABLE_AUDIO_OVERVIEWS",
+    "AUDIO_SUMMARY_MODEL",
+    "TTS_MODEL",
+    "TTS_LANGUAGE_CODE",
+    "TTS_VOICE",
+    "VIDEO_SUMMARY_MODEL",
     "TEST_GUILD_ID",
 ]

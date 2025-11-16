@@ -3,10 +3,27 @@
 from __future__ import annotations
 
 import logging
-from openai import OpenAI
-import google.generativeai as genai
+from typing import Any
 
-from config import GEMINI_API_KEY, OPENAI_API_KEY, MODEL_BASED_GATING_MODEL
+from openai import OpenAI
+import google.generativeai as generativeai
+from google import genai
+from google.genai import types as genai_types
+
+from config import (
+    AUDIO_SUMMARY_MODEL,
+    GEMINI_API_KEY,
+    OPENAI_API_KEY,
+    MODEL_BASED_GATING_MODEL,
+    TEXT_SUMMARY_MODEL_PRIMARY,
+    TEXT_SUMMARY_MODEL_FALLBACK,
+    TEXT_SUMMARY_MAX_TOKENS,
+    TEXT_SUMMARY_TEMPERATURE,
+    TTS_LANGUAGE_CODE,
+    TTS_MODEL,
+    TTS_VOICE,
+    VIDEO_SUMMARY_MODEL,
+)
 
 openai_client: OpenAI | None = None
 if OPENAI_API_KEY:
@@ -15,14 +32,20 @@ if OPENAI_API_KEY:
     except Exception as exc:  # pylint: disable=broad-except
         logging.error("Error initializing OpenAI client: %s", exc)
 
-
 gemini_model = None
 if GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_model = genai.GenerativeModel("gemini-flash-latest")
+        generativeai.configure(api_key=GEMINI_API_KEY)
+        gemini_model = generativeai.GenerativeModel(VIDEO_SUMMARY_MODEL)
     except Exception as exc:  # pylint: disable=broad-except
         logging.error("Error initializing Gemini client: %s", exc)
+
+gemini_client: genai.Client | None = None
+if GEMINI_API_KEY:
+    try:
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.error("Error initializing google-genai client: %s", exc)
 
 
 def get_ai_summary(text: str | None) -> str | None:
@@ -43,44 +66,126 @@ def get_ai_summary(text: str | None) -> str | None:
 
     try:
         response = openai_client.responses.create(
-            model="gpt-5-mini",
+            model=TEXT_SUMMARY_MODEL_PRIMARY,
             instructions=system_prompt,
             input=user_prompt,
-            max_output_tokens=256,
+            max_output_tokens=TEXT_SUMMARY_MAX_TOKENS,
         )
-        if getattr(response, "output_text", None):
-            return response.output_text.strip()
-
-        output_text = None
-        if getattr(response, "output", None):
-            for out_item in response.output:
-                if getattr(out_item, "text", None):
-                    output_text = out_item.text
-                    break
-                if getattr(out_item, "content", None):
-                    for content_item in out_item.content:
-                        if getattr(content_item, "text", None):
-                            output_text = content_item.text
-                            break
-                    if output_text:
-                        break
-        if output_text:
-            return output_text.strip()
+        summary_text = _extract_text_from_openai_response(response)
+        if summary_text:
+            return summary_text.strip()
     except Exception as exc:  # pylint: disable=broad-except
         logging.error("Responses API failed: %s", exc)
 
     try:
         completion = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=TEXT_SUMMARY_MODEL_FALLBACK,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.3,
+            temperature=TEXT_SUMMARY_TEMPERATURE,
         )
         return completion.choices[0].message.content
     except Exception as exc:  # pylint: disable=broad-except
         logging.error("OpenAI fallback chat completion failed: %s", exc)
+        return None
+
+
+def get_audio_summary(text: str | None) -> str | None:
+    """Generate a compact Spanish paragraph for audio narration."""
+
+    if not text or not openai_client:
+        return None
+
+    system_prompt = (
+        "Eres un asistente que escribe resúmenes para locución en audio. "
+        "Condensa la noticia en un solo párrafo de 2-3 frases en español neutro, "
+        "evitando opiniones fuertes y manteniendo un tono claro y directo." 
+    )
+    user_prompt = (
+        "Texto original (reduce detalles irrelevantes, prioriza hechos clave):\n"
+        f"{text[:4000]}"
+    )
+
+    try:
+        response = openai_client.responses.create(
+            model=AUDIO_SUMMARY_MODEL,
+            instructions=system_prompt,
+            input=user_prompt,
+            max_output_tokens=160,
+        )
+        summary_text = _extract_text_from_openai_response(response)
+        if summary_text:
+            return summary_text.strip()
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.error("Audio summary via Responses API failed: %s", exc)
+
+    try:
+        completion = openai_client.chat.completions.create(
+            model=TEXT_SUMMARY_MODEL_FALLBACK,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+            max_tokens=160,
+        )
+        return completion.choices[0].message.content
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.error("Audio summary fallback chat completion failed: %s", exc)
+        return None
+
+
+def generate_tts_audio(text: str | None) -> tuple[bytes, str] | None:
+    """Render the provided text into Spanish audio using Gemini TTS."""
+
+    if not text or not gemini_client:
+        return None
+
+    try:
+        audio_buffer = bytearray()
+        detected_mime: str | None = None
+
+        config = genai_types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=genai_types.SpeechConfig(
+                voice_config=genai_types.VoiceConfig(
+                    prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
+                        voice_name=TTS_VOICE
+                    )
+                ),
+                language_code=TTS_LANGUAGE_CODE,
+            ),
+        )
+
+        for chunk in gemini_client.models.generate_content_stream(
+            model=TTS_MODEL,
+            contents=[
+                genai_types.Content(
+                    role="user",
+                    parts=[genai_types.Part.from_text(text=text)],
+                )
+            ],
+            config=config,
+        ):
+            candidate = _first_candidate(chunk)
+            if not candidate or not candidate.content:
+                continue
+            for part in candidate.content.parts:
+                inline_data = getattr(part, "inline_data", None)
+                if inline_data and inline_data.data:
+                    audio_buffer.extend(inline_data.data)
+                    if inline_data.mime_type:
+                        detected_mime = inline_data.mime_type
+
+        if not audio_buffer:
+            logging.error("Gemini TTS returned no audio data.")
+            return None
+
+        return bytes(audio_buffer), detected_mime or "audio/mpeg"
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.error("Gemini TTS generation failed: %s", exc)
         return None
 
 
@@ -198,3 +303,28 @@ def is_article_relevant(text: str | None, model: str | None = None) -> bool | No
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception("OpenAI fallback chat completion failed in gating: %s", exc)
         return None
+
+
+def _extract_text_from_openai_response(response: Any) -> str | None:
+    """Best-effort extraction helper for Responses API outputs."""
+
+    if getattr(response, "output_text", None):
+        return response.output_text
+    if getattr(response, "output", None):
+        for item in response.output:
+            if getattr(item, "text", None):
+                return item.text
+            if getattr(item, "content", None):
+                for content_item in item.content:
+                    if getattr(content_item, "text", None):
+                        return content_item.text
+    return None
+
+
+def _first_candidate(chunk: Any) -> Any:
+    """Return the first candidate object from a Gemini stream chunk."""
+
+    candidates = getattr(chunk, "candidates", None)
+    if not candidates:
+        return None
+    return candidates[0]
