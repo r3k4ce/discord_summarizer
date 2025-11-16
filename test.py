@@ -11,6 +11,8 @@ import feedparser
 from config import RSS_FEEDS, YOUTUBE_CHANNEL_FEEDS
 from services.ai_services import get_ai_summary, get_gemini_summary
 from services.content_fetcher import download_image, fetch_article_with_image
+from services.gating import should_summarize, should_summarize_with_matches
+from services.ai_services import is_article_relevant
 
 
 async def test_content_fetching() -> tuple[Optional[str], Optional[str]]:
@@ -130,11 +132,53 @@ async def test_gemini_summary() -> None:
         logging.error("Gemini summary failed.")
 
 
+async def test_keyword_gating(article_text: Optional[str]) -> None:
+    """Exercise the keyword gating helper with live article text and a negative sample."""
+    if not article_text:
+        logging.warning("Skipping keyword gating test because article text is missing.")
+        return
+
+    logging.info("Running keyword gating on scraped article text...")
+    allowed_article, matches_article = await asyncio.to_thread(
+        should_summarize_with_matches, article_text, force=True
+    )
+    print("Keyword gating (article) =>", allowed_article, "matches:", matches_article)
+
+    negative_sample = """Este es un resumen neutral sobre deportes y entretenimiento.
+    No menciona economía, impuestos ni regulaciones."""
+    logging.info("Running keyword gating on negative sample text...")
+    allowed_negative, matches_negative = await asyncio.to_thread(
+        should_summarize_with_matches, negative_sample, force=True
+    )
+    print("Keyword gating (negative sample) =>", allowed_negative, "matches:", matches_negative)
+
+    # Also test pre-gating: use the article's title and lead as a cheap filter
+    logging.info("Running pre-gating on article title/lead...")
+    pre_payload = article_text[:512]
+    pre_allowed, pre_matches = await asyncio.to_thread(
+        should_summarize_with_matches, pre_payload, force=True
+    )
+    print("Pre-gating =>", pre_allowed, "matches:", pre_matches)
+
+
+async def test_model_gating(article_text: Optional[str]) -> None:
+    """Test the model-based gating classifier (returns True/False)."""
+    if not article_text:
+        logging.warning("Skipping model gating test because article text is missing.")
+        return
+
+    logging.info("Running model-based gating against scraped article text...")
+    decision = await asyncio.to_thread(is_article_relevant, article_text)
+    print("Model-based gating =>", decision)
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     print("Starting service tests...\n")
     article_text, article_image = await test_content_fetching()
     await test_ai_summary(article_text)
+    await test_model_gating(article_text)
+    await test_keyword_gating(article_text)
     await test_image_download(article_image)
     await test_youtube_thumbnail_extraction()
     await test_gemini_summary()

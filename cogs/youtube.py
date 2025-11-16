@@ -14,6 +14,8 @@ from discord.ext import commands
 from config import YOUTUBE_CHANNEL_FEEDS
 from services.ai_services import get_gemini_summary
 from services.content_fetcher import download_image
+from services.gating import should_summarize_with_matches
+from config import GATING_SHOW_MATCHES
 
 
 def _extract_thumbnail_url(entry: feedparser.FeedParserDict) -> str | None:
@@ -62,6 +64,14 @@ class YoutubeCog(commands.Cog):
                 for entry in feed.entries[:2]:
                     video_title = entry.title
                     video_link = entry.link
+                    gating_payload = f"{video_title}\n{entry.get('summary', '') or entry.get('description', '') or ''}"
+
+                    allowed, matches = await loop.run_in_executor(
+                        None, should_summarize_with_matches, gating_payload
+                    )
+                    if not allowed:
+                        logging.info("Skipping video due to gating: %s (matches=%s)", video_title, matches)
+                        continue
 
                     summary = await loop.run_in_executor(None, get_gemini_summary, video_link)
                     if not summary:
@@ -74,7 +84,10 @@ class YoutubeCog(commands.Cog):
                         url=video_link,
                         color=discord.Color.red(),
                     )
-                    embed.set_footer(text=f"Source: {feed_title}")
+                    footer_text = f"Source: {feed_title}"
+                    if GATING_SHOW_MATCHES and matches:
+                        footer_text = f"{footer_text} • Matches: {', '.join(matches)}"
+                    embed.set_footer(text=footer_text)
                     file = None
                     thumbnail_url = _extract_thumbnail_url(entry)
                     if thumbnail_url:

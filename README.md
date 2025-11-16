@@ -72,6 +72,16 @@ You can customize the news sources and YouTube channels in `config.py`:
 - **RSS_FEEDS**: List of RSS feed URLs for news sources
 - **YOUTUBE_CHANNEL_FEEDS**: List of YouTube channel feed URLs
 
+### Gating & filtering
+
+The bot filters (gates) which articles/videos are summarized. By default the system uses a model-based gating strategy (OpenAI) and falls back to keyword checks on errors.
+
+- **ENABLE_GATING**: Enable or disable gating (default: `true`).
+- **GATING_STRATEGY**: Which strategy to use for gating (`model` or `keywords`). Default: `model`.
+- **MODEL_BASED_GATING_MODEL**: The model name to use (default: `gpt-5-nano`).
+- **MODEL_BASED_GATING_FALLBACK_TO_KEYWORDS**: If true, fallback to keywords when the model cannot classify (default: `true`).
+
+
 Example YouTube channel feed URL format:
 ```
 https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID_HERE

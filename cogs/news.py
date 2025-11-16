@@ -10,9 +10,10 @@ import discord
 import feedparser
 from discord.ext import commands
 
-from config import RSS_FEEDS
+from config import ARTICLES_PER_FEED, GATING_SHOW_MATCHES, RSS_FEEDS
 from services.ai_services import get_ai_summary
 from services.content_fetcher import download_image, fetch_article_with_image
+from services.gating import should_summarize_with_matches
 
 
 class NewsCog(commands.Cog):
@@ -33,15 +34,23 @@ class NewsCog(commands.Cog):
                 feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
                 feed_title = feed.feed.get("title", "News Feed")
 
-                for entry in feed.entries[:2]:
+                for entry in feed.entries[:ARTICLES_PER_FEED]:
                     article_title = entry.title
                     article_link = entry.link
+
                     article_text, article_image_url = await loop.run_in_executor(
                         None, fetch_article_with_image, article_link
                     )
 
                     if not article_text:
                         logging.warning("Could not scrape article: %s", article_title)
+                        continue
+
+                    allowed, matches = await loop.run_in_executor(
+                        None, should_summarize_with_matches, article_text
+                    )
+                    if not allowed:
+                        logging.info("Skipping article due to gating: %s (matches=%s)", article_title, matches)
                         continue
 
                     summary = await loop.run_in_executor(None, get_ai_summary, article_text)
@@ -55,7 +64,10 @@ class NewsCog(commands.Cog):
                         url=article_link,
                         color=discord.Color.blue(),
                     )
-                    embed.set_footer(text=f"Source: {feed_title}")
+                    footer_text = f"Source: {feed_title}"
+                    if GATING_SHOW_MATCHES and matches:
+                        footer_text = f"{footer_text} • Matches: {', '.join(matches)}"
+                    embed.set_footer(text=footer_text)
                     file = None
                     if article_image_url:
                         image_bytes = await loop.run_in_executor(None, download_image, article_image_url)
