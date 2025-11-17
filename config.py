@@ -82,11 +82,8 @@ VIDEO_SUMMARY_MODEL = os.getenv("VIDEO_SUMMARY_MODEL", "gemini-flash-latest")
 # --- Feed configuration ---
 ARTICLES_PER_FEED = int(os.getenv("ARTICLES_PER_FEED", "10"))
 RSS_FEEDS = [
-    # "http://feeds.bbci.co.uk/news/world/rss.xml",
-    # "http://rss.cnn.com/rss/cnn_topstories.rss",
-    # "https://feeds.reuters.com/reuters/topNews",
     "https://www.montevideo.com.uy/anxml.aspx?58",
-    "https://www.elobservador.com.uy/rss/pages/nacional.xml"
+    "https://www.elobservador.com.uy/rss/pages/nacional.xml",
 ]
 
 YOUTUBE_CHANNEL_FEEDS = [
